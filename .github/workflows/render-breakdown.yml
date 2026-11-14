@@ -10,7 +10,7 @@ on:
         description: "Header subtitle (optional, default 'Exploded view')"
         required: false
       labels:
-        description: "Exactly 6 lines, top layer first. Each line: Name | short note (note optional). Example: Cover glass | toughened, 0.6mm"
+        description: "Exactly 6 entries separated by semicolons. Each: Name | short note. Example: Cover glass | toughened, 0.6mm; OLED display | 6.3in, 120Hz; Titanium frame | grade 5; Logic board | 3nm chip; Battery | 3582 mAh; Back glass | matte"
         required: true
       time:
         description: "Lock-screen time (optional, e.g. 9:41)"
@@ -48,10 +48,11 @@ jobs:
         run: |
           python3 << 'PY'
           import json, os
-          lines = [l for l in os.environ["LABELS_IN"].splitlines() if l.strip()]
+          raw = os.environ["LABELS_IN"]
+          entries = [e.strip() for e in raw.split(";") if e.strip()]
           labels = []
-          for l in lines:
-              parts = [p.strip() for p in l.split("|", 1)]
+          for e in entries:
+              parts = [p.strip() for p in e.split("|", 1)]
               labels.append(parts if len(parts) == 2 else [parts[0], ""])
           spec = {"labels": labels}
           if os.environ.get("TITLE_IN"):
