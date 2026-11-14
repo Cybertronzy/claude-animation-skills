@@ -1,0 +1,79 @@
+name: Render breakdown
+
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: "Header title, shown in capitals (optional, default Phone)"
+        required: false
+      subtitle:
+        description: "Header subtitle (optional, default 'Exploded view')"
+        required: false
+      labels:
+        description: "Exactly 6 lines, top layer first. Each line: Name | short note (note optional). Example: Cover glass | toughened, 0.6mm"
+        required: true
+      time:
+        description: "Lock-screen time (optional, e.g. 9:41)"
+        required: false
+      date:
+        description: "Lock-screen date (optional, e.g. Saturday 1 November)"
+        required: false
+      accent:
+        description: "Accent hex colour (optional, default #F08A5D)"
+        required: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ffmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+      - name: One-time kit setup
+        run: bash kit/setup.sh
+      - name: Write the spec
+        env:
+          TITLE_IN: ${{ inputs.title }}
+          SUBTITLE_IN: ${{ inputs.subtitle }}
+          LABELS_IN: ${{ inputs.labels }}
+          TIME_IN: ${{ inputs.time }}
+          DATE_IN: ${{ inputs.date }}
+          ACCENT_IN: ${{ inputs.accent }}
+        run: |
+          python3 << 'PY'
+          import json, os
+          lines = [l for l in os.environ["LABELS_IN"].splitlines() if l.strip()]
+          labels = []
+          for l in lines:
+              parts = [p.strip() for p in l.split("|", 1)]
+              labels.append(parts if len(parts) == 2 else [parts[0], ""])
+          spec = {"labels": labels}
+          if os.environ.get("TITLE_IN"):
+              spec["title"] = os.environ["TITLE_IN"]
+          if os.environ.get("SUBTITLE_IN"):
+              spec["subtitle"] = os.environ["SUBTITLE_IN"]
+          if os.environ.get("TIME_IN"):
+              spec["time"] = os.environ["TIME_IN"]
+          if os.environ.get("DATE_IN"):
+              spec["date"] = os.environ["DATE_IN"]
+          if os.environ.get("ACCENT_IN"):
+              spec["accent"] = os.environ["ACCENT_IN"]
+          with open("render.bd.json", "w") as f:
+              json.dump(spec, f)
+          print(json.dumps(spec, indent=2))
+          PY
+      - name: Render
+        run: python3 skills/breakdown/build.py render.bd.json
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: render
+          path: |
+            render.bd.mp4
+            render.bd.sheet.jpg
