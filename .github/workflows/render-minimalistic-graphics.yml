@@ -1,0 +1,65 @@
+name: Render minimal graphics
+
+on:
+  workflow_dispatch:
+    inputs:
+      line1:
+        description: "First line of text (keep under ~30 characters)"
+        required: true
+      line2:
+        description: "Second line (optional) — appears when the dot reaches the top"
+        required: false
+      steps:
+        description: "Number of steps the dot hops up (3 to 7, default 5)"
+        required: false
+        default: "5"
+      light:
+        description: "Light mode: black lines on white"
+        type: boolean
+        default: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ffmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+      - name: One-time kit setup
+        run: bash kit/setup.sh
+      - name: Write the spec
+        env:
+          LINE1: ${{ inputs.line1 }}
+          LINE2: ${{ inputs.line2 }}
+          STEPS_IN: ${{ inputs.steps }}
+          LIGHT_IN: ${{ inputs.light }}
+        run: |
+          python3 << 'PY'
+          import json, os
+          lines = [os.environ["LINE1"]]
+          if os.environ.get("LINE2"):
+              lines.append(os.environ["LINE2"])
+          spec = {
+              "lines": lines,
+              "steps": int(os.environ.get("STEPS_IN") or 5),
+              "light": os.environ.get("LIGHT_IN") == "true",
+          }
+          with open("render.mg.json", "w") as f:
+              json.dump(spec, f)
+          print(json.dumps(spec, indent=2))
+          PY
+      - name: Render
+        run: python3 skills/minimalistic-graphics/build.py render.mg.json
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: render
+          path: |
+            render.mg.mp4
+            render.mg.sheet.jpg
