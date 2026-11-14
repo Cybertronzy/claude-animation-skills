@@ -1,0 +1,96 @@
+name: Render animation
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Label (e.g. Followers)"
+        required: true
+      values:
+        description: "Comma-separated numbers, e.g. 1.2,2.1,3.4,5,9,24,51,78,100"
+        required: true
+      labels:
+        description: "Comma-separated axis labels (optional), e.g. Jan,Feb,Mar"
+        required: false
+      final:
+        description: "Final number to land on (optional), e.g. 100000"
+        required: false
+      prefix:
+        description: "Prefix (optional), e.g. $"
+        required: false
+      suffix:
+        description: "Suffix (optional), e.g. %"
+        required: false
+      decimals:
+        description: "Decimal places (optional, default 0)"
+        required: false
+        default: "0"
+      dark:
+        description: "Dark mode: white line on black"
+        type: boolean
+        default: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+
+      - name: One-time kit setup
+        run: bash kit/setup.sh
+
+      - name: Write the spec
+        env:
+          LABEL: ${{ inputs.label }}
+          VALUES: ${{ inputs.values }}
+          LABELS_IN: ${{ inputs.labels }}
+          FINAL_IN: ${{ inputs.final }}
+          PREFIX_IN: ${{ inputs.prefix }}
+          SUFFIX_IN: ${{ inputs.suffix }}
+          DECIMALS_IN: ${{ inputs.decimals }}
+          DARK_IN: ${{ inputs.dark }}
+        run: |
+          python3 << 'PY'
+          import json, os
+
+          values = [float(x) for x in os.environ["VALUES"].split(",") if x.strip()]
+          labels = [x.strip() for x in os.environ.get("LABELS_IN", "").split(",") if x.strip()]
+
+          spec = {"label": os.environ["LABEL"], "values": values}
+          if labels:
+              spec["labels"] = labels
+          if os.environ.get("FINAL_IN"):
+              spec["final"] = float(os.environ["FINAL_IN"])
+          if os.environ.get("PREFIX_IN"):
+              spec["prefix"] = os.environ["PREFIX_IN"]
+          if os.environ.get("SUFFIX_IN"):
+              spec["suffix"] = os.environ["SUFFIX_IN"]
+          spec["decimals"] = int(os.environ.get("DECIMALS_IN") or 0)
+          spec["dark"] = os.environ.get("DARK_IN") == "true"
+
+          with open("render.graph.json", "w") as f:
+              json.dump(spec, f)
+          print(json.dumps(spec, indent=2))
+          PY
+
+      - name: Render
+        run: python3 skills/graph/build.py render.graph.json
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: render
+          path: |
+            render.graph.mp4
+            render.graph.sheet.jpg
