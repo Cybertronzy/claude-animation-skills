@@ -1,0 +1,84 @@
+name: Render map route
+
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: "Destination name (e.g. Iron Yard Gym)"
+        required: true
+      minutes:
+        description: "ETA in minutes (e.g. 9)"
+        required: true
+      distance:
+        description: "Distance (e.g. 2.8)"
+        required: true
+      unit:
+        description: "Distance unit"
+        type: choice
+        options:
+          - km
+          - mi
+        default: km
+      places:
+        description: "5 small map labels, comma-separated (optional): near start, left park, mid-route, right park, the river"
+        required: false
+      accent:
+        description: "Accent hex colour for the route/dot/ETA (optional, default #2f7cf6)"
+        required: false
+      seed:
+        description: "Whole number for a different building layout (optional, default 7)"
+        required: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ffmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+      - name: One-time kit setup
+        run: bash kit/setup.sh
+      - name: Write the spec
+        env:
+          DEST: ${{ inputs.destination }}
+          MINUTES_IN: ${{ inputs.minutes }}
+          DISTANCE_IN: ${{ inputs.distance }}
+          UNIT_IN: ${{ inputs.unit }}
+          PLACES_IN: ${{ inputs.places }}
+          ACCENT_IN: ${{ inputs.accent }}
+          SEED_IN: ${{ inputs.seed }}
+        run: |
+          python3 << 'PY'
+          import json, os
+          spec = {
+              "destination": os.environ["DEST"],
+              "minutes": float(os.environ["MINUTES_IN"]),
+              "distance": float(os.environ["DISTANCE_IN"]),
+              "unit": os.environ.get("UNIT_IN") or "km",
+          }
+          places = [p.strip() for p in os.environ.get("PLACES_IN", "").split(",") if p.strip()]
+          if places:
+              spec["places"] = places
+          if os.environ.get("ACCENT_IN"):
+              spec["accent"] = os.environ["ACCENT_IN"]
+          if os.environ.get("SEED_IN"):
+              spec["seed"] = int(os.environ["SEED_IN"])
+          with open("render.map.json", "w") as f:
+              json.dump(spec, f)
+          print(json.dumps(spec, indent=2))
+          PY
+      - name: Render
+        run: python3 skills/map-route/build.py render.map.json
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: render
+          path: |
+            render.map.mp4
+            render.map.sheet.jpg
