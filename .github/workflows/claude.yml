@@ -44,10 +44,32 @@ jobs:
           claude_args: |
             --allowedTools "Bash,Write,Edit,Read,Glob,Grep,LS"
 
+      # Adds the corner channel bug over the opening hook + a FOLLOW outro card
+      # to whatever output.mp4 the step above produced. Never touches the hook
+      # itself - see kit/post/add_intro_outro.sh for why it's built this way.
+      - name: Add intro bug + outro CTA
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -f output.mp4 ]; then
+            pip install --quiet --break-system-packages pillow numpy soundfile scipy
+            bash kit/post/add_intro_outro.sh output.mp4 output_final.mp4 \
+              "${{ vars.CHANNEL_HANDLE || '@yourhandle' }}" \
+              "${{ vars.CHANNEL_CTA || 'FOR MORE' }}"
+          fi
+
       - name: Upload rendered video
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: render
+          path: output_final.mp4
+          if-no-files-found: ignore
+
+      - name: Upload raw render (fallback, no intro/outro)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-raw
           path: output.mp4
           if-no-files-found: ignore
