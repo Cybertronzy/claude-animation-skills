@@ -58,8 +58,8 @@ ffmpeg -v error -y -i "$IN" -loop 1 -t "$DUR" -i "$WORK/bug.png" -filter_complex
 echo "== building the outro card"
 ffmpeg -v error -y -sseof -0.1 -i "$IN" -frames:v 1 "$WORK/last.png"
 OUTRO_SEC=2.6
-OUTRO_FRAMES=$(( $(printf '%.0f' "$(echo "$OUTRO_SEC * $FPS" | bc -l 2>/dev/null || echo 78)") ))
-[ "$OUTRO_FRAMES" -gt 0 ] || OUTRO_FRAMES=78
+OUTRO_FRAMES="$(awk -v s="$OUTRO_SEC" -v f="$FPS" 'BEGIN{printf "%.0f", s*f}')"
+[ "$OUTRO_FRAMES" -gt 0 ] 2>/dev/null || OUTRO_FRAMES=78
 
 ffmpeg -v error -y -loop 1 -i "$WORK/last.png" -loop 1 -i "$WORK/badge.png" -filter_complex "
   [0:v]scale=${W}:${H},
@@ -78,12 +78,13 @@ ffmpeg -v error -y -loop 1 -i "$WORK/last.png" -loop 1 -i "$WORK/badge.png" -fil
 echo "== crossfading into the outro and syncing the sting"
 XFD=0.5
 MAIN_DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WORK/main_with_bug.mp4")"
-OFFSET="$(echo "$MAIN_DUR - $XFD" | bc -l)"
+OFFSET="$(awk -v d="$MAIN_DUR" -v x="$XFD" 'BEGIN{printf "%.3f", d-x}')"
+STING_MS="$(awk -v d="$MAIN_DUR" 'BEGIN{printf "%.0f", (d-0.08)*1000}')"
 
 ffmpeg -v error -y -i "$WORK/main_with_bug.mp4" -i "$WORK/outro.mp4" -i "$WORK/sting.wav" -filter_complex "
   [0:v][1:v]xfade=transition=fade:duration=${XFD}:offset=${OFFSET}[v];
   [0:a]apad=pad_dur=${OUTRO_SEC}[a0];
-  [2:a]adelay=$(echo "($MAIN_DUR - 0.08) * 1000" | bc -l | cut -d. -f1)|$(echo "($MAIN_DUR - 0.08) * 1000" | bc -l | cut -d. -f1)[sting];
+  [2:a]adelay=${STING_MS}|${STING_MS}[sting];
   [a0][sting]amix=inputs=2:duration=first:normalize=0,
   alimiter=limit=0.9:attack=2:release=60[a]
 " -map "[v]" -map "[a]" -c:v libx264 -preset medium -crf 16 -pix_fmt yuv420p \
