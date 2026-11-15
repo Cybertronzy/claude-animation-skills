@@ -62,6 +62,11 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --allowedTools "Bash,Write,Edit,Read,Glob,Grep,LS"
+          # TEMPORARY: several runs have come back with num_turns:0 and no
+          # error, which the action normally hides behind "full output
+          # hidden for security". Turning this on so the next run shows the
+          # real reason instead of guessing. Remove once the cause is found.
+          show_full_output: true
 
       # Adds the corner channel bug over the opening hook + a FOLLOW outro card
       # to whatever output.mp4 the step above produced. Never touches the hook
