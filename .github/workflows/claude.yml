@@ -38,6 +38,25 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
 
+      # The ~1GB voice/word-timing models (kit/models), the npm/Playwright
+      # install (kit/node_modules + Playwright's own browser cache) and the
+      # Python voice venv (kit/.venv) are all idempotent - kit/setup.sh
+      # already skips anything that's already on disk. Restoring them here,
+      # before Claude's turn runs setup.sh, means only the very first run
+      # (or a run after setup.sh changes) ever pays that download again.
+      - name: Cache animation-skill models & deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            kit/node_modules
+            kit/.venv
+            kit/models
+            kit/vendor
+            ~/.cache/ms-playwright
+          key: anim-kit-${{ hashFiles('kit/setup.sh', 'kit/package-lock.json') }}
+          restore-keys: |
+            anim-kit-
+
       - uses: anthropics/claude-code-action@v1.0.206
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
