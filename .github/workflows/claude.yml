@@ -62,9 +62,6 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --allowedTools "Bash,Write,Edit,Read,Glob,Grep,LS"
-          # TEMPORARY: keeping full output on for one more confirmation run
-          # after the .claude/skills/ fix below, then removing.
-          show_full_output: true
 
       # Adds the corner channel bug over the opening hook + a FOLLOW outro card
       # to whatever output.mp4 the step above produced. Never touches the hook
