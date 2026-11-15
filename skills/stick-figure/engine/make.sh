@@ -9,7 +9,14 @@
 #   AUDIO_ONLY=1 make.sh ~/reels/pirate    # remix the sound only (reuses the last picture)
 set -euo pipefail
 ENGINE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KIT="$(cd "$ENGINE/../../../kit" && pwd)"
+# walk up from the engine dir to find kit/ (its depth varies: skills/<name>/engine vs .claude/skills/<name>/engine)
+KIT=""; d="$ENGINE"
+for _ in 1 2 3 4 5 6 7 8; do
+  d="$(dirname "$d")"
+  if [ -f "$d/kit/setup.sh" ]; then KIT="$d/kit"; break; fi
+  [ "$d" = "/" ] && break
+done
+[ -n "$KIT" ] || { echo "could not find kit/ above $ENGINE"; exit 1; }
 DIR="$(cd "${1:?usage: make.sh <reel-folder> [kokoro|elevenlabs|file]}" && pwd)"
 VOICE="${2:-keep}"
 WORKERS="${WORKERS:-4}"

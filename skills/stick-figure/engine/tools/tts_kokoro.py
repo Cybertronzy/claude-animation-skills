@@ -2,7 +2,19 @@
 #   tts_kokoro.py [voice] [speed]     defaults: am_michael 1.12 (other voices: af_heart, am_adam, bf_emma, bm_george ...)
 import json, sys, os, shutil, tempfile, numpy as np, soundfile as sf
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-KIT = os.path.realpath(os.path.join(ROOT, "..", "..", "..", "kit"))  # the voice models live in kit/models
+def _find_kit(start):
+    # walk up from the engine dir to find kit/ (its depth varies: skills/<name>/engine vs .claude/skills/<name>/engine)
+    d = start
+    for _ in range(8):
+        cand = os.path.join(d, "kit")
+        if os.path.isfile(os.path.join(cand, "setup.sh")):
+            return os.path.realpath(cand)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    sys.exit(f"could not find kit/ above {start}")
+KIT = _find_kit(ROOT)  # the voice models live in kit/models
 from kokoro_onnx import Kokoro, EspeakConfig
 import espeakng_loader
 

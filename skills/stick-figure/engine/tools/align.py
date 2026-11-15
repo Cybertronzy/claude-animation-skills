@@ -2,7 +2,19 @@
 # Writes audio/words_new.json and audio/warp.json (old-time -> new-time anchors).
 import json, re, difflib, os, shutil, numpy as np, soundfile as sf, sherpa_onnx, glob, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-KIT = os.path.realpath(os.path.join(ROOT, "..", "..", "..", "kit"))  # the voice models live in kit/models
+def _find_kit(start):
+    # walk up from the engine dir to find kit/ (its depth varies: skills/<name>/engine vs .claude/skills/<name>/engine)
+    d = start
+    for _ in range(8):
+        cand = os.path.join(d, "kit")
+        if os.path.isfile(os.path.join(cand, "setup.sh")):
+            return os.path.realpath(cand)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    sys.exit(f"could not find kit/ above {start}")
+KIT = _find_kit(ROOT)  # the voice models live in kit/models
 src = sys.argv[1] if len(sys.argv) > 1 else 'audio/vo.wav'
 d = glob.glob(os.path.join(KIT, "models", "sherpa-onnx-nemo-parakeet*"))
 if not d: sys.exit(f"the word-timing model is missing: run  bash {KIT}/setup.sh --voice")
