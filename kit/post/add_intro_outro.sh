@@ -61,6 +61,12 @@ OUTRO_SEC=2.6
 OUTRO_FRAMES="$(awk -v s="$OUTRO_SEC" -v f="$FPS" 'BEGIN{printf "%.0f", s*f}')"
 [ "$OUTRO_FRAMES" -gt 0 ] 2>/dev/null || OUTRO_FRAMES=78
 
+# Build the big caption-matching CTA line from the handle's own CTA text (falls
+# back to "FOR MORE" if none given) instead of a hardcoded phrase, and shrink
+# the font a bit for a longer CTA so it never runs off the 1080px width.
+CTA_LINE="$(printf '%s' "FOLLOW ${CTA2}" | tr -d "\\\\:'")"
+CTA_FONTSIZE="$(awk -v n="${#CTA_LINE}" 'BEGIN{fs=78; if (n>16) fs=78*16/n; if (fs<44) fs=44; printf "%.0f", fs}')"
+
 ffmpeg -v error -y -loop 1 -i "$WORK/last.png" -loop 1 -i "$WORK/badge.png" -filter_complex "
   [0:v]scale=${W}:${H},
        eq=brightness=-0.10:saturation=0.85,
@@ -69,8 +75,8 @@ ffmpeg -v error -y -loop 1 -i "$WORK/last.png" -loop 1 -i "$WORK/badge.png" -fil
   [1:v]format=rgba,
        scale=w='if(lt(t,0.15),560*(t/0.15),560+26*sin(2*PI*(t-0.15)*1.6))':h=-1:eval=frame[badge];
   [bg][badge]overlay=x=(W-w)/2:y=H*0.30-h/2:shortest=1[withbadge];
-  [withbadge]drawtext=fontfile=$FONT:text='FOLLOW FOR MORE':
-       fontsize=78:fontcolor=white:bordercolor=0x221c22:borderw=8:
+  [withbadge]drawtext=fontfile=$FONT:text='${CTA_LINE}':
+       fontsize=${CTA_FONTSIZE}:fontcolor=white:bordercolor=0x221c22:borderw=8:
        x=(w-text_w)/2:y=H*0.74[v]
 " -map "[v]" -frames:v "$OUTRO_FRAMES" -c:v libx264 -preset medium -crf 17 -pix_fmt yuv420p -an "$WORK/outro.mp4"
 
