@@ -43,3 +43,11 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --allowedTools "Bash,Write,Edit,Read,Glob,Grep,LS"
+
+      - name: Upload rendered video
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render
+          path: output.mp4
+          if-no-files-found: ignore
