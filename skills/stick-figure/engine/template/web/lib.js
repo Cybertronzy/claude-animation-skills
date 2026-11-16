@@ -106,3 +106,40 @@ function text(ctx, str, x, y, size, fill = '#fff', stroke = INK, sw = 0, font = 
   if (sw) { ctx.lineWidth = sw; ctx.strokeStyle = stroke; ctx.lineJoin = 'round'; ctx.strokeText(str, x, y); }
   ctx.fillStyle = fill; ctx.fillText(str, x, y);
 }
+
+// Bold multi-line hook-title card: the full "why/how/what if" question, spelled
+// out on screen the instant the video starts (not just spoken) - the pattern
+// seen on high-performing explainer channels. Call it from shot A's draw():
+//   drawHookTitle(ctx, ['WHY DO WE', 'SWALLOW GUM?'], lt, {accentIndex: 1})
+// lines: array of short ALL-CAPS strings (2-4 lines, ~1-4 words each read well).
+// lt: the shot's local time in seconds. accentIndex colors one line to call out
+// the twist/payoff word; -1 for none. It pops in instantly (no slow fade-in -
+// the hook can't wait), holds, then fades as the scene's action takes over.
+function drawHookTitle(ctx, lines, lt, opts = {}) {
+  const {
+    holdUntil = 2.2, fadeDur = 0.35, accentIndex = -1,
+    accentColor = '#ffd23a', y = 330, lineH = 108, size = 92, maxW = 960,
+  } = opts;
+  if (lt > holdUntil + fadeDur) return;
+  const popT = clamp(lt / 0.22);
+  const scale = lerp(0.82, 1, backOut(popT));
+  const fadeOutT = lt > holdUntil ? clamp((lt - holdUntil) / fadeDur) : 0;
+  const alpha = 1 - fadeOutT;
+  const riseY = lerp(26, 0, popT);
+  // auto-shrink so the longest line never runs off the safe area
+  ctx.save();
+  ctx.font = `800 ${size}px Poppins`;
+  const widest = Math.max(...lines.map(l => ctx.measureText(l).width));
+  ctx.restore();
+  const fit = Math.min(1, maxW / Math.max(1, widest));
+  const fsize = size * fit, flineH = lineH * fit;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(W / 2, y - riseY);
+  ctx.scale(scale, scale);
+  lines.forEach((line, i) => {
+    const fill = i === accentIndex ? accentColor : '#fff';
+    text(ctx, line, 0, i * flineH, fsize, fill, INK, fsize * 0.16, 'Poppins', 800);
+  });
+  ctx.restore();
+}

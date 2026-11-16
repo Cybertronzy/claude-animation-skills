@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
-Procedural "follow" sting for the outro: a quick confirming pop + a bright
-upward chime, built the same way the stick-figure skill builds its own SFX
-(numpy oscillators/noise through butterworth filters) so the outro doesn't
-need any external sample and matches the show's existing sound language.
+Procedural brand stings for the open and close of every reel, built the same
+way the stick-figure skill builds its own SFX (numpy oscillators/noise
+through butterworth filters) so neither needs an external sample and both
+match the show's existing sound language. The open and close share the same
+pop/chime vocabulary so they read as one audio signature, not two unrelated
+sounds - "open" is a quick single confirming tick synced to the watermark's
+pop-in; "close" is the fuller double-pop + chime synced to the outro cut.
 
-Usage: python3 sting.py <out.wav>
+Usage: python3 sting.py open <out.wav>
+       python3 sting.py close <out.wav>
 """
 import sys
 import numpy as np
@@ -55,7 +59,14 @@ def whoosh_tail(dur=0.25):
     return x * e * 0.35
 
 
-def build(out_path):
+def _write(buf, total, out_path):
+    buf = buf[:total]
+    peak = np.max(np.abs(buf)) or 1.0
+    buf = buf / peak * 0.92
+    sf.write(out_path, buf.astype(np.float32), SR)
+
+
+def build_close(out_path):
     total = int(1.1 * SR)
     buf = np.zeros(total)
 
@@ -71,10 +82,28 @@ def build(out_path):
     place(chime([880.0, 1108.7, 1318.5, 1760.0]), 0.10, 0.9)
     place(whoosh_tail(), 0.02, 0.5)
 
-    peak = np.max(np.abs(buf)) or 1.0
-    buf = buf / peak * 0.92
-    sf.write(out_path, buf.astype(np.float32), SR)
+    _write(buf, total, out_path)
+
+
+def build_open(out_path):
+    # a lighter sibling of the close sting: one confirming tick plus a
+    # quick rising two-note chirp, synced to the watermark's pop-in rather
+    # than a full outro moment - same vocabulary (pop + chime), smaller scale
+    total = int(0.42 * SR)
+    buf = np.zeros(total)
+
+    def place(x, at, g=1.0):
+        i = int(at * SR)
+        j = min(total, i + len(x))
+        if i < total:
+            buf[i:j] += x[: j - i] * g
+
+    place(pop(760), 0.00, 0.85)
+    place(chime([1108.7, 1760.0]), 0.03, 0.55)
+
+    _write(buf, total, out_path)
 
 
 if __name__ == "__main__":
-    build(sys.argv[1])
+    mode, out = (sys.argv[1], sys.argv[2]) if len(sys.argv) > 2 else ("close", sys.argv[1])
+    (build_open if mode == "open" else build_close)(out)
