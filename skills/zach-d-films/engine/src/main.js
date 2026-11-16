@@ -5,7 +5,8 @@ import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { SHOTS, CAPTIONS, DURATION, FADES } from './shots.js';
+import { clamp, lerp, easeOut } from './anim.js';
+import { SHOTS, CAPTIONS, DURATION, FADES, HOOK_TITLE } from './shots.js';
 
 const W = 720, H = 1280;
 const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
@@ -106,6 +107,30 @@ composer.addPass(grade);
 const capEl = document.getElementById('cap');
 const fadeEl = document.getElementById('fade');
 const hud = document.getElementById('hud');
+const hookEl = document.getElementById('hookTitle');
+function setupHookTitle() {
+  if (!HOOK_TITLE || !HOOK_TITLE.lines) return;
+  hookEl.innerHTML = HOOK_TITLE.lines
+    .map((l, i) => `<div${i === HOOK_TITLE.accentIndex ? ' class="htAccent"' : ''}>${l}</div>`)
+    .join('');
+  // auto-shrink so the longest line never wraps or runs off the safe area - must
+  // run after the 'Cap' webfont is loaded, or the measurement undershoots. A
+  // block's scrollWidth doesn't grow for visually-overflowing overflow:visible
+  // content, so measure each line as a shrink-to-fit inline-block instead,
+  // which reports its real intrinsic width under whatever font actually renders.
+  const baseSize = 54, safeW = 672;
+  let widest = 0;
+  for (const child of hookEl.children) {
+    child.style.display = 'inline-block';
+    widest = Math.max(widest, child.getBoundingClientRect().width);
+    child.style.display = '';
+  }
+  // shrink to a 90% safety margin of the box width - font metrics measured
+  // just after a webfont swap-in can undershoot the eventually-painted width,
+  // so always leave headroom rather than only reacting once it measures over
+  const target = Math.min(1, (safeW * 0.9) / Math.max(1, widest));
+  hookEl.style.fontSize = `${baseSize * target}px`;
+}
 const built = new Map();
 function getShot(i) {
   if (!built.has(i)) built.set(i, SHOTS[i].build({ makeStage, W, H }));
@@ -138,6 +163,15 @@ window.renderAt = (t) => {
   // captions + fades
   const c = CAPTIONS.filter(c => t >= c[0]).pop();
   capEl.textContent = c && (c[2] == null || t < c[2]) ? c[1] : '';
+  // hook-title card: pops in instantly over the opening shot, then fades as
+  // the scene's own action takes over
+  if (HOOK_TITLE && HOOK_TITLE.lines) {
+    const holdUntil = HOOK_TITLE.holdUntil ?? 2.2, fadeDur = HOOK_TITLE.fadeDur ?? 0.35;
+    const popT = clamp(t / 0.22);
+    const fadeOutT = t > holdUntil ? clamp((t - holdUntil) / fadeDur) : 0;
+    hookEl.style.opacity = t > holdUntil + fadeDur ? 0 : (1 - fadeOutT);
+    hookEl.style.transform = `translateY(${lerp(16, 0, popT)}px) scale(${lerp(0.86, 1, easeOut(popT))})`;
+  }
   let f = 0;
   for (const [a, b, c2, d] of FADES) if (t >= a && t < d) f = Math.max(f, t < b ? (t - a) / (b - a) : t < c2 ? 1 : (d - t) / (d - c2));
   fadeEl.style.opacity = f;
@@ -147,7 +181,7 @@ window.renderAt = (t) => {
 
 // interactive preview: ?t=12.3 for a still, otherwise realtime playback
 const qs = new URLSearchParams(location.search);
-window.ready = document.fonts.ready.then(() => true);
+window.ready = document.fonts.ready.then(() => { setupHookTitle(); return true; });
 if (qs.has('t')) window.ready.then(() => window.renderAt(parseFloat(qs.get('t'))));
 else if (!qs.has('render')) {
   const audio = new Audio('./audio.m4a');

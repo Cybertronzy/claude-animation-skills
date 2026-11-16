@@ -20,6 +20,16 @@ export const CAPTIONS = [
 // [fadeInStart, fullStart, fullEnd, fadeOutEnd] to black
 export const FADES = [[6.02, 6.2, 6.3, 6.46]];
 
+// Bold hook-title card: the full question spelled out on screen from frame 1,
+// not just spoken (the pattern high-performing explainer channels use). 2 to 3
+// short ALL-CAPS lines; accentIndex colors the payoff line.
+export const HOOK_TITLE = {
+  lines: ['COULD ANCIENT ARMOR', 'STOP A BULLET?'],
+  accentIndex: 1,
+  holdUntil: 2.2,
+  fadeDur: 0.35,
+};
+
 const toWorld = (obj, v) => obj.localToWorld(v.clone());
 function surfaceHit(scene, target, from, to) {
   scene.updateMatrixWorld(true);

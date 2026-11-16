@@ -16,6 +16,17 @@
   }
   #fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
   #hud { position: fixed; left: 730px; top: 10px; color: #aaa; font: 13px monospace; }
+  /* Bold hook-title card: the full question spelled out on screen from frame 1,
+     not just spoken - set once from HOOK_TITLE in shots.js, animated in main.js. */
+  #hookTitle {
+    position: absolute; left: 24px; right: 24px; top: 150px; text-align: center;
+    font: 800 54px/1.12 'Cap', sans-serif; color: #fff; letter-spacing: -0.3px;
+    text-shadow: 0 2px 0 #171217, -2px 0 0 #171217, 2px 0 0 #171217, 0 -2px 0 #171217,
+                 0 6px 16px rgba(0,0,0,.35);
+    opacity: 0; transform-origin: 50% 0%;
+  }
+  #hookTitle .htAccent { color: #ffd23a; }
+  #hookTitle div { white-space: nowrap; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -25,7 +36,7 @@
 </script>
 </head>
 <body>
-<div id="stage"><div id="fade"></div><div id="cap"></div></div>
+<div id="stage"><div id="fade"></div><div id="cap"></div><div id="hookTitle"></div></div>
 <div id="hud"></div>
 <script type="module" src="./src/main.js"></script>
 </body>
