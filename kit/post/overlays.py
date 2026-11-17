@@ -50,36 +50,28 @@ def stroked_text(draw, xy, text, size, fill=WHITE, stroke=INK, stroke_w=6, ancho
 
 
 def make_bug(out_path, handle, persistent=False):
-    """Small rounded pill, top-right channel bug (logo glyph + handle text).
-    Sized tightly around the icon + handle text (measured, not a fixed
-    canvas) so the translucent pill just encases its content instead of
-    trailing off into empty space. persistent=True dims it slightly since
-    it now stays onscreen for the whole video rather than just the
-    opening hook."""
+    """Top-right channel bug: just the logo glyph (coral ring + cursive H)
+    and the handle text, no background pill behind them - the pill (and
+    its white outline) read as visual clutter, so the bug now sits
+    directly on the video. Sized tightly around the icon + handle text
+    (measured, not a fixed canvas)."""
     h = 164 * SS
-    pad = 10 * SS
     r = 42 * SS                       # logo mark radius - this mark has finer detail
                                        # (a thin ring + cursive H) than the old play-glyph
                                        # and needs real size to still read this small
     gap = 14 * SS                     # icon -> text gap
     text_size = 40
     f = font(text_size)
-    # measure the handle text at supersample res to size the pill tightly
+    # measure the handle text at supersample res to size the canvas tightly
     meas = Image.new("RGBA", (10, 10))
     tb = ImageDraw.Draw(meas).textbbox((0, 0), handle, font=f, stroke_width=5 * SS)
     text_w = tb[2] - tb[0]
     icon_d = 2 * r
     left_margin = 20 * SS
-    right_margin = 30 * SS
+    right_margin = 20 * SS
     w = left_margin + icon_d + gap + text_w + right_margin
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    pill_alpha = 104 if persistent else 178
-    # translucent ink pill (same ink as the rest of the show's outline work) -
-    # no outline stroke: the white ring around the pill competed visually
-    # with the logo mark's own ring, so the pill is now just a soft fill.
-    d.rounded_rectangle([pad, pad, w - pad, h - pad], radius=(h - 2 * pad) // 2,
-                         fill=(0x22, 0x1c, 0x22, pill_alpha))
     # the real logo mark
     mark = brand_mark(icon_d)
     img.paste(mark, (left_margin, h // 2 - r), mark)
