@@ -75,9 +75,11 @@ def make_bug(out_path, handle, persistent=False):
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     pill_alpha = 104 if persistent else 178
-    # translucent ink pill (same ink as the rest of the show's outline work)
+    # translucent ink pill (same ink as the rest of the show's outline work) -
+    # no outline stroke: the white ring around the pill competed visually
+    # with the logo mark's own ring, so the pill is now just a soft fill.
     d.rounded_rectangle([pad, pad, w - pad, h - pad], radius=(h - 2 * pad) // 2,
-                         fill=(0x22, 0x1c, 0x22, pill_alpha), outline=WHITE, width=5 * SS)
+                         fill=(0x22, 0x1c, 0x22, pill_alpha))
     # the real logo mark
     mark = brand_mark(icon_d)
     img.paste(mark, (left_margin, h // 2 - r), mark)
