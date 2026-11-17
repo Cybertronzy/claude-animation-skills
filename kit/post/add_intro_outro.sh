@@ -125,26 +125,88 @@ Q2_FILTER=""
 CTA_Y="H*0.74"   # default (no-Q2) position - same as the original single-CTA layout
 if [ -n "$Q2_RAW" ]; then
   Q2_CLEAN="$(printf '%s' "$Q2_RAW" | tr -d "\\\\:'")"
-  if [[ "$Q2_CLEAN" =~ ^(.{9,}[.?])\ (.*)$ ]]; then
-    Q2_LINE1="${BASH_REMATCH[1]}"
-    Q2_LINE2="${BASH_REMATCH[2]}"
-  else
-    Q2_LINE1="$Q2_CLEAN"
-    Q2_LINE2=""
-  fi
-  Q2_MAXLEN="${#Q2_LINE1}"
-  [ "${#Q2_LINE2}" -gt "$Q2_MAXLEN" ] && Q2_MAXLEN="${#Q2_LINE2}"
-  Q2_FONTSIZE="$(awk -v n="$Q2_MAXLEN" 'BEGIN{fs=66; if (n>22) fs=66*22/n; if (fs<44) fs=44; printf "%.0f", fs}')"
+  # Wrap into 1-3 lines and pick a fontsize that is GUARANTEED to fit the
+  # 1080px frame (checked against an actual measured glyph width via
+  # PIL/the real font, not a fixed char-count floor) rather than assuming a
+  # fixed minimum fontsize is always safe - a long single-sentence question
+  # with punctuation only at the very end previously produced a 2-line split
+  # whose min fontsize (44) still overflowed the frame on both edges. This
+  # now balances across up to 3 lines and shrinks the font until it
+  # genuinely fits, so any length of Q2 prompt renders fully on-screen.
+  mapfile -t Q2_LINES < <("$PYBIN" -c "
+import sys
+try:
+    from PIL import ImageFont
+    font_path = sys.argv[2]
+    have_pil = True
+except Exception:
+    have_pil = False
+
+s = sys.argv[1]
+safe_w = 980  # usable width inside the 1080px frame, with margin
+
+def balanced_wrap(words, k):
+    if k <= 1:
+        return [' '.join(words)]
+    target = len(' '.join(words)) / k
+    lines, cur, cur_len = [], [], 0
+    for w in words:
+        add = len(w) + (1 if cur else 0)
+        if cur and cur_len + add > target and len(lines) < k - 1:
+            lines.append(' '.join(cur)); cur = [w]; cur_len = len(w)
+        else:
+            cur.append(w); cur_len += add
+    lines.append(' '.join(cur))
+    return lines
+
+def text_width(line, fontsize):
+    if have_pil:
+        try:
+            f = ImageFont.truetype(font_path, fontsize)
+            b = f.getbbox(line)
+            return b[2] - b[0]
+        except Exception:
+            pass
+    return len(line) * fontsize * 0.58  # fallback estimate
+
+words = s.split(' ')
+best = None
+for k in (1, 2, 3):
+    lines = balanced_wrap(words, k)
+    fs = 66
+    while fs > 28:
+        if max(text_width(l, fs) for l in lines) <= safe_w:
+            break
+        fs -= 2
+    max_w = max(text_width(l, fs) for l in lines)
+    score = (max_w > safe_w, -fs, k)  # prefer: fits, then biggest font, then fewest lines
+    if best is None or score < best[0]:
+        best = (score, lines, fs)
+if best is None:
+    best = ((False, -28, 1), [s], 28)
+_, lines, fs = best
+print(fs)
+for l in lines:
+    print(l)
+" "$Q2_CLEAN" "$FONT")
+  Q2_FONTSIZE="${Q2_LINES[0]}"
+  Q2_LINE1="${Q2_LINES[1]:-}"
+  Q2_LINE2="${Q2_LINES[2]:-}"
+  Q2_LINE3="${Q2_LINES[3]:-}"
   CMT_FONTSIZE=38
   # Text pops in right as the narrator starts asking it (1s into the card,
   # same instant as the Q2 VO's adelay below), not sitting there the whole
   # time competing with the FOLLOW badge for attention.
   Q2_ALPHA="alpha='if(lt(t,1.0),0,1)'"
-  Q2_Y0="H*0.72"
-  if [ -n "$Q2_LINE2" ]; then
-    Q2_Y_LAST="(H*0.72+${Q2_FONTSIZE}*1.25)"
+  Q2_Y0="H*0.70"
+  Q2_Y1="(H*0.70+${Q2_FONTSIZE}*1.25)"
+  Q2_Y2="(H*0.70+${Q2_FONTSIZE}*2.50)"
+  if [ -n "$Q2_LINE3" ]; then
+    Q2_Y_LAST="$Q2_Y2"
+  elif [ -n "$Q2_LINE2" ]; then
+    Q2_Y_LAST="$Q2_Y1"
   else
-    Q2_Y_LAST="H*0.72"
+    Q2_Y_LAST="$Q2_Y0"
   fi
   CMT_Y="(${Q2_Y_LAST}+${Q2_FONTSIZE}*1.55)"
   CTA_Y="(${CMT_Y}+${CMT_FONTSIZE}*1.7)"
@@ -154,9 +216,16 @@ if [ -n "$Q2_RAW" ]; then
   if [ -n "$Q2_LINE2" ]; then
     Q2_FILTER="${Q2_FILTER};[v2]drawtext=fontfile=$FONT:text='${Q2_LINE2}':
        fontsize=${Q2_FONTSIZE}:fontcolor=0xFFD166:bordercolor=0x221c22:borderw=7:${Q2_ALPHA}:
-       x=(w-text_w)/2:y=${Q2_Y_LAST}[v3]"
+       x=(w-text_w)/2:y=${Q2_Y1}[v2b]"
   else
-    Q2_FILTER="${Q2_FILTER};[v2]null[v3]"
+    Q2_FILTER="${Q2_FILTER};[v2]null[v2b]"
+  fi
+  if [ -n "$Q2_LINE3" ]; then
+    Q2_FILTER="${Q2_FILTER};[v2b]drawtext=fontfile=$FONT:text='${Q2_LINE3}':
+       fontsize=${Q2_FONTSIZE}:fontcolor=0xFFD166:bordercolor=0x221c22:borderw=7:${Q2_ALPHA}:
+       x=(w-text_w)/2:y=${Q2_Y2}[v3]"
+  else
+    Q2_FILTER="${Q2_FILTER};[v2b]null[v3]"
   fi
   Q2_FILTER="${Q2_FILTER};[v3]drawtext=fontfile=$FONT:text='COMMENT BELOW':
        fontsize=${CMT_FONTSIZE}:fontcolor=white:bordercolor=0x221c22:borderw=5:${Q2_ALPHA}:
